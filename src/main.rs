@@ -1,5 +1,5 @@
 use clap::Parser;
-use dlt_convert::{parse_message, strip_null, Message};
+use dlt_convert::{parse_message, strip_null, ExtendedHeader, LogTypeInfo, Message, MessageInfo};
 use std::{io::Read, path::PathBuf};
 
 #[derive(Parser, Debug)]
@@ -30,15 +30,26 @@ fn main() {
             rest,
         ) = parse_message(data).unwrap();
 
-        let text = String::from_utf8_lossy(strip_null(payload));
-
-        println!(
-            "{} [{}]: {:?}",
-            storage_header.timestamp.naive_local(),
-            storage_header.ecu,
-            text
-        );
-
         data = rest;
+
+        if let Some(ExtendedHeader {
+            message_type: MessageInfo::Log { level },
+            apid,
+            ctid,
+            ..
+        }) = extended_header
+        {
+            let text = String::from_utf8_lossy(strip_null(payload));
+
+            println!(
+                "{} [{:>4}] [{:>4}] [{}] [{}]: {}",
+                storage_header.timestamp.naive_local(),
+                ctid,
+                apid,
+                storage_header.ecu,
+                level.as_str(),
+                text
+            );
+        }
     }
 }

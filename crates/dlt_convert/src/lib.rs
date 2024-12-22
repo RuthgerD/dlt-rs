@@ -1,5 +1,3 @@
-
-
 use chrono::{DateTime, Utc};
 use std::borrow::Cow;
 
@@ -144,10 +142,70 @@ pub fn parse_extensions(
 
 #[derive(Debug)]
 pub struct ExtendedHeader<'a> {
-    pub msin: u8,
+    pub message_type: MessageInfo,
     pub noar: u8,
     pub apid: Cow<'a, str>,
     pub ctid: Cow<'a, str>,
+}
+
+#[derive(Debug)]
+pub enum MessageInfo {
+    Log { level: LogTypeInfo },
+    AppTrace,
+    NwTrace,
+    Control,
+    Reserved,
+}
+
+impl MessageInfo {
+    fn from_raw(ty: u8, data: u8) -> Self {
+        match ty {
+            0x0 => Self::Log {
+                level: LogTypeInfo::from_raw(data),
+            },
+            0x1 => Self::AppTrace,
+            0x2 => Self::NwTrace,
+            0x3 => Self::Control,
+            _ => Self::Reserved,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum LogTypeInfo {
+    Fatal,
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Verbose,
+    Reserved,
+}
+
+impl LogTypeInfo {
+    fn from_raw(data: u8) -> Self {
+        match data {
+            0x1 => Self::Fatal,
+            0x2 => Self::Error,
+            0x3 => Self::Warn,
+            0x4 => Self::Info,
+            0x5 => Self::Debug,
+            0x6 => Self::Verbose,
+            _ => Self::Reserved,
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            LogTypeInfo::Fatal => "fatal",
+            LogTypeInfo::Error => "error",
+            LogTypeInfo::Warn => "warn",
+            LogTypeInfo::Info => "info",
+            LogTypeInfo::Debug => "debug",
+            LogTypeInfo::Verbose => "verbose",
+            LogTypeInfo::Reserved => "reserved",
+        }
+    }
 }
 
 pub fn parse_extended_header(data: &[u8]) -> Option<(ExtendedHeader, &[u8])> {
@@ -159,9 +217,12 @@ pub fn parse_extended_header(data: &[u8]) -> Option<(ExtendedHeader, &[u8])> {
     let apid = String::from_utf8_lossy(strip_null(apid_bytes));
     let ctid = String::from_utf8_lossy(strip_null(ctid_bytes));
 
+    let message_type = MessageInfo::from_raw((msin >> 1) & 0b111, (msin >> 4) & 0b1111);
+    let verbose = msin & 0b1;
+
     Some((
         ExtendedHeader {
-            msin: *msin,
+            message_type,
             noar: *noar,
             apid,
             ctid,
