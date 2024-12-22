@@ -20,6 +20,7 @@ pub fn parse_message(data: &[u8]) -> Option<(Message, &[u8])> {
 
     let (standard_header, data) = parse_standard_header(data)?;
 
+
     let msb_first = standard_header.htyp & 0x02 != 0;
     if msb_first {
         return None;
@@ -43,7 +44,7 @@ pub fn parse_message(data: &[u8]) -> Option<(Message, &[u8])> {
 
     let parsed_bytes = data.as_ptr() as usize - start.as_ptr() as usize;
 
-    let rest_bytes = standard_header.len as usize - (parsed_bytes) + 16;
+    let rest_bytes = standard_header.len - parsed_bytes;
 
     let (payload, data) = data.split_at(rest_bytes);
 
@@ -96,7 +97,7 @@ pub fn parse_storage_header(data: &[u8]) -> Option<(StorageHeader, &[u8])> {
 pub struct StandardHeader {
     pub htyp: u8,
     pub mcnt: u8,
-    pub len: u16,
+    pub len: usize,
 }
 
 pub fn parse_standard_header(data: &[u8]) -> Option<(StandardHeader, &[u8])> {
@@ -104,7 +105,7 @@ pub fn parse_standard_header(data: &[u8]) -> Option<(StandardHeader, &[u8])> {
     let ([mcnt], data) = data.split_first_chunk::<1>()?;
     let (len_bytes, data) = data.split_first_chunk::<2>()?;
 
-    let len = u16::from_be_bytes(*len_bytes);
+    let len = u16::from_be_bytes(*len_bytes) as usize + 16;
 
     Some((
         StandardHeader {
